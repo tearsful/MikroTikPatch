@@ -96,10 +96,10 @@ jobs:
       if: steps.get_latest.outputs.has_new_version == 'true' && matrix.arch == 'x86'
       run: |
         sudo unzip netinstall.zip
-        sudo -H python3 patch.py netinstall netinstall.exe
+        sudo -E python3 patch.py netinstall netinstall.exe
         sudo zip netinstall-$LATEST_VERSION.zip ./netinstall.exe
         sudo tar -xvf netinstall.tar.gz
-        sudo -H python3 patch.py netinstall netinstall-cli
+        sudo -E python3 patch.py netinstall netinstall-cli
         sudo tar -czvf netinstall-$LATEST_VERSION.tar.gz ./netinstall-cli
 
     - name: Cache mikrotik-${{ env.LATEST_VERSION }}${{ env.ARCH }}.iso
