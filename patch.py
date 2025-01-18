@@ -84,7 +84,7 @@ def patch_initrd_xz(initrd_xz:bytes,key_dict:dict,ljust=True):
         if old_public_key in new_initrd:
             print(f'initrd public key patched {old_public_key[:16].hex().upper()}...')
             new_initrd = new_initrd.replace(old_public_key,new_public_key)
-    preset = 6
+    preset = 8
     new_initrd_xz = lzma.compress(new_initrd,check=lzma.CHECK_CRC32,filters=[{"id": lzma.FILTER_LZMA2, "preset": preset }] )
     while len(new_initrd_xz) > len(initrd_xz) and preset < 9:
         print(f'preset:{preset}')
