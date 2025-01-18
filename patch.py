@@ -93,7 +93,7 @@ def patch_initrd_xz(initrd_xz:bytes,key_dict:dict,ljust=True):
         preset += 1
         new_initrd_xz = lzma.compress(new_initrd,check=lzma.CHECK_CRC32,filters=[{"id": lzma.FILTER_LZMA2, "preset": preset }] )
     if len(new_initrd_xz) > len(initrd_xz):
-        new_initrd_xz = lzma.compress(new_initrd,check=lzma.CHECK_CRC32,filters=[{"id": lzma.FILTER_LZMA2, "preset": lzma.PRESET_EXTREME,'dict_size': 32*1024*1024,"lc": 4,"lp": 2, "pb": 2,}] )
+        new_initrd_xz = lzma.compress(new_initrd,check=lzma.CHECK_CRC32,filters=[{"id": lzma.FILTER_LZMA2, "preset": 9,'dict_size': 32*1024*1024,"lc": 4,"lp": 2, "pb": 2,}] )
     if ljust:
         print(f'preset:{preset}')
         print(f'new initrd xz size:{len(new_initrd_xz)}')
