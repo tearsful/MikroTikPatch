@@ -289,7 +289,7 @@ jobs:
         sudo rm ./install-image-$LATEST_VERSION.img
 
     - name: Cache chr-${{ env.LATEST_VERSION }}${{ env.ARCH }}.img.zip
-      if: steps.get_latest.outputs.has_new_version == 'true' && matrix.arch == 'arm64'
+      if: steps.get_latest.outputs.has_new_version == 'true'
       id: cache-chr-img
       uses: actions/cache@v4
       with:
@@ -298,7 +298,7 @@ jobs:
         key: chr-${{ env.LATEST_VERSION }}-${{ matrix.arch }}.img
 
     - name: Get chr-${{ env.LATEST_VERSION }}${{ env.ARCH }}.img
-      if: steps.get_latest.outputs.has_new_version == 'true' && steps.cache-chr-img.outputs.cache-hit != 'true' && matrix.arch == 'arm64'
+      if: steps.get_latest.outputs.has_new_version == 'true' && steps.cache-chr-img.outputs.cache-hit != 'true'
       run: |
           sudo wget -nv -O chr.img.zip https://download.mikrotik.com/routeros/$LATEST_VERSION/chr-$LATEST_VERSION$ARCH.img.zip
           sudo unzip chr.img.zip
@@ -309,7 +309,7 @@ jobs:
       if: steps.get_latest.outputs.has_new_version == 'true'
       run: |
         sudo modprobe nbd
-        sudo apt-get install -y qemu-utils extlinux > /dev/null
+        sudo apt-get install -y qemu-utils > /dev/null
         truncate --size 128M chr-$LATEST_VERSION$ARCH.img
         sgdisk --clear --set-alignment=2 \
             --new=1::+32M --typecode=1:8300 --change-name=1:"RouterOS Boot" --attributes=1:set:2 \
@@ -330,12 +330,42 @@ jobs:
         sudo mkdir -p ./img/{boot,routeros}
         sudo mount /dev/nbd0p1 ./img/boot/
         if [ "${{ matrix.arch }}" == "x86" ]; then
-          sudo mkdir -p  ./img/boot/{BOOT,EFI/BOOT}
-          sudo cp BOOTX64.EFI ./img/boot/EFI/BOOT/BOOTX64.EFI
-          sudo extlinux --install  -H 64 -S 32 ./img/boot/BOOT
-          echo -e "default system\nlabel system\n\tkernel /EFI/BOOT/BOOTX64.EFI\n\tappend load_ramdisk=1 root=/dev/ram0 quiet" > syslinux.cfg
-          sudo cp syslinux.cfg ./img/boot/BOOT/
-          sudo rm syslinux.cfg
+          sudo cp chr.img chr-$LATEST_VERSION$ARCH-legacy-bios.img 
+          sudo qemu-nbd -c /dev/nbd1 -f raw chr-$LATEST_VERSION$ARCH-legacy-bios.img
+          sudo -E python3 patch.py block /dev/nbd1p1 EFI/BOOT/BOOTX64.EFI
+          sudo mkdir -p ./chr/{boot,routeros}
+          sudo mount /dev/nbd1p1 ./chr/boot/
+          sudo mkdir -p  ./img/boot/EFI/BOOT
+          sudo cp ./chr/boot/EFI/BOOT/BOOTX64.EFI ./img/boot/EFI/BOOT/BOOTX64.EFI
+          sudo umount /dev/nbd1p1
+          sudo mount /dev/nbd1p2 ./chr/routeros/
+          sudo mkdir -p ./chr/routeros/var/pdb/{system,option}
+          sudo cp ./all_packages/option-$LATEST_VERSION$ARCH.npk ./chr/routeros/var/pdb/option/image
+          sudo cp ./all_packages/routeros-$LATEST_VERSION$ARCH.npk ./chr/routeros/var/pdb/system/image
+          sudo umount /dev/nbd1p2
+          sudo rm -rf ./chr
+          sudo qemu-nbd -d /dev/nbd1
+
+          sudo qemu-img convert -f raw -O qcow2 chr-$LATEST_VERSION$ARCH-legacy-bios.img chr-$LATEST_VERSION$ARCH-legacy-bios.qcow2
+          sudo qemu-img convert -f raw -O vmdk chr-$LATEST_VERSION$ARCH-legacy-bios.img chr-$LATEST_VERSION$ARCH-legacy-bios.vmdk
+          sudo qemu-img convert -f raw -O vpc chr-$LATEST_VERSION$ARCH-legacy-bios.img chr-$LATEST_VERSION$ARCH-legacy-bios.vhd
+          sudo qemu-img convert -f raw -O vhdx chr-$LATEST_VERSION$ARCH-legacy-bios.img chr-$LATEST_VERSION$ARCH-legacy-bios.vhdx
+          sudo qemu-img convert -f raw -O vdi chr-$LATEST_VERSION$ARCH-legacy-bios.img chr-$LATEST_VERSION$ARCH-legacy-bios.vdi
+
+          sudo zip chr-$LATEST_VERSION$ARCH-legacy-bios.qcow2.zip chr-$LATEST_VERSION$ARCH-legacy-bios.qcow2
+          sudo zip chr-$LATEST_VERSION$ARCH-legacy-bios.vmdk.zip chr-$LATEST_VERSION$ARCH-legacy-bios.vmdk
+          sudo zip chr-$LATEST_VERSION$ARCH-legacy-bios.vhd.zip chr-$LATEST_VERSION$ARCH-legacy-bios.vhd
+          sudo zip chr-$LATEST_VERSION$ARCH-legacy-bios.vhdx.zip chr-$LATEST_VERSION$ARCH-legacy-bios.vhdx
+          sudo zip chr-$LATEST_VERSION$ARCH-legacy-bios.vdi.zip chr-$LATEST_VERSION$ARCH-legacy-bios.vdi
+          sudo zip chr-$LATEST_VERSION$ARCH-legacy-bios.img.zip chr-$LATEST_VERSION$ARCH-legacy-bios.img
+
+          sudo rm chr-$LATEST_VERSION$ARCH-legacy-bios.qcow2
+          sudo rm chr-$LATEST_VERSION$ARCH-legacy-bios.vmdk
+          sudo rm chr-$LATEST_VERSION$ARCH-legacy-bios.vhd
+          sudo rm chr-$LATEST_VERSION$ARCH-legacy-bios.vhdx
+          sudo rm chr-$LATEST_VERSION$ARCH-legacy-bios.vdi
+          sudo rm chr-$LATEST_VERSION$ARCH-legacy-bios.img
+
         elif [ "${{ matrix.arch }}" == "arm64" ]; then
           sudo qemu-nbd -c /dev/nbd1 -f raw chr.img
           sudo mkdir -p ./chr/boot
@@ -375,6 +405,7 @@ jobs:
         sudo rm chr-$LATEST_VERSION$ARCH.vhdx
         sudo rm chr-$LATEST_VERSION$ARCH.vdi
         sudo rm chr-$LATEST_VERSION$ARCH.img
+
 
     - name: Upload Files
       if: steps.get_latest.outputs.has_new_version == 'true'
